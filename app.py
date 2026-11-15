@@ -16,7 +16,8 @@ import streamlit as st
 
 from modules.expense_calculator import calculate_comparison
 from modules.recommendation import get_recommendations
-from modules.route_distance import PUNE_AREAS, get_road_distance_km
+from modules.route_distance import PUNE_AREAS, get_road_distance_between
+from modules.location_catalog import build_location_catalog, bus_stop_ids, nearest_metro_station
 from modules.traffic_analysis import load_traffic_data, traffic_summary, hourly_traffic, vehicle_distribution
 
 ROOT = Path(__file__).resolve().parent
@@ -262,12 +263,15 @@ def prepare_bus_data():
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def safe_road_distance(source, destination):
+def safe_road_distance(source_coords, destination_coords):
+    """Road distance for any catalogue location, with a coordinate fallback."""
     try:
-        return get_road_distance_km(source, destination), "Road-distance estimate"
+        return get_road_distance_between(source_coords, destination_coords), "Road-distance estimate"
     except Exception:
-        a, b = PUNE_AREAS[source], PUNE_AREAS[destination]
-        lat1, lon1, lat2, lon2 = map(math.radians, [a[0], a[1], b[0], b[1]])
+        lat1, lon1, lat2, lon2 = map(
+            math.radians,
+            [source_coords[0], source_coords[1], destination_coords[0], destination_coords[1]],
+        )
         h = math.sin((lat2-lat1)/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin((lon2-lon1)/2)**2
         straight = 6371 * 2 * math.asin(math.sqrt(h))
         return round(straight * 1.28, 1), "Approximate distance (routing service unavailable)"
@@ -434,19 +438,40 @@ if page == "Home":
 
 # --------------------------- Journey planner ---------------------------
 if page == "Plan my journey":
-    hero("A better way to get there.", "Compare Pune travel options by cost and time. Choose your route, see bus and Metro possibilities, and decide what works for today.")
-    areas = sorted(PUNE_AREAS)
+    hero("A better way to get there.", "Compare Pune travel options by cost and time. Choose from localities, landmarks, PMPML stops and Metro stations in one place.")
+    try:
+        data, route_stops, network, places, metro_data = prepare_bus_data()
+        location_catalog = build_location_catalog(data["stops"], metro_data)
+    except Exception as exc:
+        data = route_stops = network = metro_data = None
+        location_catalog = {
+            f"Area · {name}": {"name": name, "kind": "area", "coords": coords, "stop_ids": (), "metro_station": None}
+            for name, coords in PUNE_AREAS.items()
+        }
+        st.warning(f"Public-transport data could not be loaded; locality-based comparison is still available. Details: {exc}")
+
+    location_options = sorted(location_catalog, key=str.casefold)
+    default_source = "Area · Kothrud" if "Area · Kothrud" in location_catalog else location_options[0]
+    default_destination = "Area · Pimpri" if "Area · Pimpri" in location_catalog else next(x for x in location_options if x != default_source)
     with st.container(border=True):
         st.markdown("### Where are you headed?")
+        st.caption("One searchable list: areas, landmarks, PMPML bus stops and Metro stations. Start typing a place or stop name.")
         c1, c2 = st.columns(2)
-        source = c1.selectbox("From", areas, index=areas.index("Kothrud"), key="journey_source")
-        destination = c2.selectbox("To", [x for x in areas if x != source], index=[x for x in areas if x != source].index("Pimpri") if "Pimpri" in [x for x in areas if x != source] else 0, key="journey_destination")
+        source_label = c1.selectbox("From", location_options, index=location_options.index(default_source), key="journey_source_unified")
+        destination_options = [x for x in location_options if x != source_label]
+        if st.session_state.get("journey_destination_unified") not in destination_options:
+            st.session_state["journey_destination_unified"] = default_destination if default_destination in destination_options else destination_options[0]
+        destination_label = c2.selectbox("To", destination_options, index=destination_options.index(st.session_state["journey_destination_unified"]), key="journey_destination_unified")
+        source_location = location_catalog[source_label]
+        destination_location = location_catalog[destination_label]
+        source = source_location["name"]
+        destination = destination_location["name"]
         c3, c4, c5 = st.columns([1,1,1])
         days = c3.number_input("Travel days per month", 1, 31, 22, key="travel_days")
         budget = c4.number_input("Monthly budget (₹)", 0, 100000, 3000, 100, key="journey_budget")
         priority = c5.selectbox("Show me the", ["Best balance", "Cheapest", "Fastest"], key="journey_priority")
         peak = st.checkbox("I usually travel during busy hours", value=True, help="Applies a stated estimate to road-based travel modes.")
-        distance, distance_note = safe_road_distance(source, destination)
+        distance, distance_note = safe_road_distance(source_location["coords"], destination_location["coords"])
         st.caption(f"Approx. {distance:.1f} km one way · {distance_note}. Actual door-to-door distance may differ.")
         run_compare = st.button("Find my best options  →", use_container_width=True, type="primary")
 
@@ -457,20 +482,20 @@ if page == "Plan my journey":
         if priority == "Cheapest": best_mode = rec["cheapest"]
         elif priority == "Fastest": best_mode = rec["fastest"]
         else: best_mode = rec["balanced"]
-        st.session_state["ps_result"] = {"details": details, "best": best_mode, "source": source,
-            "destination": destination, "days": int(days), "budget": budget, "priority": priority,
+        st.session_state["ps_result"] = {"details": details, "best": best_mode, "source": source_label,
+            "destination": destination_label, "days": int(days), "budget": budget, "priority": priority,
             "peak": peak, "distance": distance}
         # Clear previous route search when the main journey changes.
         st.session_state.pop("ps_bus_plans", None)
         st.session_state.pop("ps_bus_query", None)
 
     saved = st.session_state.get("ps_result")
-    current = saved and (saved["source"], saved["destination"], saved["days"], saved["priority"], saved["peak"]) == (source, destination, int(days), priority, peak)
+    current = saved and (saved["source"], saved["destination"], saved["days"], saved["priority"], saved["peak"]) == (source_label, destination_label, int(days), priority, peak)
     if current:
         details = saved["details"].copy()
         best = details[details["Transport Mode"] == saved["best"]].iloc[0]
         st.markdown("<div class='section-kicker'>YOUR SHORTLIST</div>", unsafe_allow_html=True)
-        st.markdown(f"### {source} <span style='color:#bd6848'>→</span> {destination}", unsafe_allow_html=True)
+        st.markdown(f"### {source} → {destination}")
         cards = st.columns(3)
         cheapest = details.loc[details["Monthly Cost (₹)"].idxmin()]
         fastest = details.loc[details["Daily Travel Time (min)"].idxmin()]
@@ -497,61 +522,58 @@ if page == "Plan my journey":
         st.markdown("### Prefer a bus or Metro? Start here.")
         transport_view = st.radio("Choose public transport", ["PMPML bus journeys", "Pune Metro journeys"], horizontal=True, key="transport_view")
 
-        # Bus and Metro tools are selectable directly from the homepage.
+        # Public-transport suggestions reuse the same unified From / To selections.
         if transport_view == "PMPML bus journeys":
-            try:
-                data, route_stops, network, places, metro_data = prepare_bus_data()
-                from bus_modules.places import resolve_place
-                from bus_modules.journey import plan_journeys, describe
-                b1, b2, b3 = st.columns([1,1,.8])
-                bus_from = b1.selectbox("Board near", places, index=places.index(source) if source in places else (places.index("Kothrud") if "Kothrud" in places else 0), key="bus_from_v2")
-                bus_to = b2.selectbox("Get off near", places, index=places.index(destination) if destination in places else (places.index("Pimpri") if "Pimpri" in places else min(1,len(places)-1)), key="bus_to_v2")
-                leave = b3.time_input("Leave around", dt.time(9,0), key="bus_leave_v2")
-                if st.button("Find bus journeys", key="find_bus_v2", use_container_width=True):
-                    from_ids = resolve_place(bus_from, data["stops"])
-                    to_ids = resolve_place(bus_to, data["stops"])
-                    plans = plan_journeys(network, from_ids, to_ids, leave.hour*3600+leave.minute*60, max_results=5) if from_ids and to_ids else []
-                    st.session_state["ps_bus_plans"] = plans
-                    st.session_state["ps_bus_query"] = (bus_from,bus_to,leave.strftime("%H:%M"))
-                query_key = (bus_from,bus_to,leave.strftime("%H:%M"))
-                plans = st.session_state.get("ps_bus_plans", []) if st.session_state.get("ps_bus_query") == query_key else []
-                if plans:
-                    st.caption("Schedule-based suggestions from the included PMPML feed. Check the operator for current service before departure.")
-                    for i, plan in enumerate(plans,1):
-                        mins = max(0,(plan["arrive"]-plan["board"])//60)
-                        with st.expander(f"Option {i} · {'Direct bus' if plan['changes']==0 else 'One change'} · about {mins} min", expanded=i==1):
-                            for instruction in describe(plan):
-                                st.markdown(instruction)
-                elif st.session_state.get("ps_bus_query") == query_key:
-                    st.info("No matching direct or one-change journey was found in this dataset for that search. Try a nearby stop or another departure time.")
-                else:
-                    st.caption("Choose your boarding and destination stops, then find available bus journeys.")
-            except Exception as exc:
-                st.error(f"Bus journey search could not load: {exc}")
+            if data is None:
+                st.info("PMPML suggestions are unavailable because the local GTFS data could not be loaded.")
+            else:
+                try:
+                    from bus_modules.journey import plan_journeys, describe
+                    leave = st.time_input("Leave around", dt.time(9,0), key="bus_leave_unified")
+                    if st.button("Find bus journeys for these locations", key="find_bus_unified", use_container_width=True):
+                        from_ids = bus_stop_ids(source_location, data["stops"])
+                        to_ids = bus_stop_ids(destination_location, data["stops"])
+                        plans = plan_journeys(network, from_ids, to_ids, leave.hour*3600+leave.minute*60, max_results=5) if from_ids and to_ids else []
+                        st.session_state["ps_bus_plans"] = plans
+                        st.session_state["ps_bus_query"] = (source_label, destination_label, leave.strftime("%H:%M"))
+                    query_key = (source_label, destination_label, leave.strftime("%H:%M"))
+                    plans = st.session_state.get("ps_bus_plans", []) if st.session_state.get("ps_bus_query") == query_key else []
+                    if plans:
+                        st.caption("Schedule-based suggestions from the included PMPML feed. Check the operator for current service before departure.")
+                        for i, plan in enumerate(plans,1):
+                            mins = max(0,(plan["arrive"]-plan["board"])//60)
+                            with st.expander(f"Option {i} · {'Direct bus' if plan['changes']==0 else 'One change'} · about {mins} min", expanded=i==1):
+                                for instruction in describe(plan):
+                                    st.markdown(instruction)
+                    elif st.session_state.get("ps_bus_query") == query_key:
+                        st.info("No matching direct or one-change journey was found for these selected locations in the included dataset. Try a nearby stop or another departure time.")
+                    else:
+                        st.caption(f"Searching buses from {source} to {destination} using the same locations selected above.")
+                except Exception as exc:
+                    st.error(f"Bus journey search could not load: {exc}")
 
         elif transport_view == "Pune Metro journeys":
-            try:
-                _, _, _, _, metro_data = prepare_bus_data()
-                stations = sorted(metro_data["station"].dropna().astype(str).unique(), key=str.casefold)
-                default_from = AREA_STATION_HINTS.get(source, "Vanaz")
-                default_to = AREA_STATION_HINTS.get(destination, "PCMC")
-                m1,m2 = st.columns(2)
-                metro_from = m1.selectbox("Board at Metro station", stations, index=stations.index(default_from) if default_from in stations else 0, key="metro_from_v2")
-                metro_to = m2.selectbox("Get off at Metro station", [s for s in stations if s != metro_from], index=([s for s in stations if s != metro_from].index(default_to) if default_to in [s for s in stations if s != metro_from] else 0), key="metro_to_v2")
-                route = metro_route(metro_from, metro_to, metro_data)
-                if route:
-                    r1,r2,r3 = st.columns(3)
-                    r1.metric("Corridor", route["line"])
-                    r2.metric("Interchanges", route["changes"])
-                    r3.metric("Stations travelled", route["stations"])
-                    st.markdown("**Your Metro journey**")
-                    for step in route["steps"]:
-                        st.markdown(f"- {step}")
-                    st.caption("Station-to-station route suggestion only. This dataset does not include live train times, station access, operational alerts or official fare calculation.")
+            if metro_data is None:
+                st.info("Metro suggestions are unavailable because the station directory could not be loaded.")
+            else:
+                origin_station = nearest_metro_station(source_location, metro_data)
+                destination_station = nearest_metro_station(destination_location, metro_data)
+                if not origin_station or not destination_station:
+                    st.info("A Metro station could not be matched to one of these locations. Try selecting a Metro station directly from the From / To lists.")
                 else:
-                    st.info("Choose two different stations to see the Metro route.")
-            except Exception as exc:
-                st.error(f"Metro options could not load: {exc}")
+                    route = metro_route(origin_station, destination_station, metro_data)
+                    st.caption(f"Nearest reference stations: {origin_station} → {destination_station}. Access distance and walking directions are not included.")
+                    if route:
+                        r1,r2,r3 = st.columns(3)
+                        r1.metric("Corridor", route["line"])
+                        r2.metric("Interchanges", route["changes"])
+                        r3.metric("Stations travelled", route["stations"])
+                        st.markdown("**Your Metro journey**")
+                        for step in route["steps"]:
+                            st.markdown(f"- {step}")
+                        st.caption("Station-to-station route suggestion only. This dataset does not include live train times, station access, operational alerts or official fare calculation.")
+                    else:
+                        st.info("The selected locations map to the same Metro station, so there is no station-to-station Metro journey to show.")
         st.caption(f"Estimates use assumed fares, average speeds and vehicle efficiency (fuel reference ₹{PETROL_PRICE_PER_LITRE:.2f}/L). PMPML options use the supplied GTFS snapshot. This prototype does not provide live vehicle tracking or guaranteed departure times.")
 
     else:

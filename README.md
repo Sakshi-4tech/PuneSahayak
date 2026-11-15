@@ -117,3 +117,8 @@ See `TEAM_OF_4.md` for a four-person work split, `VIVA_GUIDE.md` for likely viva
 - Supplemental PMPML bus-stop and route directory catalogue: [OpenCity / Pune Municipal Corporation](https://data.opencity.in/dataset/pune-bus-stops-and-routes).
 - Pune Metro station/corridor names: [Official Pune Metro station directory](https://www.punemetrorail.org/know-your-metro-stations) and [official route map](https://www.punemetrorail.org/route-map).
 - Historical traffic data and original GoPune analysis modules are retained from the team's supplied project archive. Keep upstream student-project attribution for adapted modules where applicable.
+
+
+## Unified journey locations
+
+The journey planner provides one searchable From/To catalogue containing Pune localities, key landmarks, PMPML GTFS bus stops, and Metro stations. Bus and Metro suggestions reuse those same selections. Distance and nearest-station values are estimates based on reference coordinates; the app does not provide live tracking or walking directions.

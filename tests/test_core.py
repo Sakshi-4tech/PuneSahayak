@@ -119,3 +119,46 @@ def test_traffic_distribution_uses_all_four_vehicle_types():
     result = vehicle_distribution(traffic)
     assert set(result.index) == {"Cars", "Motorbikes", "Buses", "Trucks"}
     assert (result >= 0).all()
+
+
+def test_unified_location_catalog_contains_areas_landmarks_bus_stops_and_metro():
+    from modules.location_catalog import build_location_catalog
+    data = load_gtfs(ROOT / "data" / "gtfs")
+    metro = load_metro(ROOT / "data" / "gtfs" / "metro_stations.csv")
+    catalog = build_location_catalog(data["stops"], metro)
+    assert "Area · Kothrud" in catalog
+    assert "Landmark · MIT-WPU" in catalog
+    assert "Landmark · Pune Railway Station" in catalog
+    assert "Bus stop · Katraj" in catalog
+    assert "Metro · Vanaz" in catalog
+    assert len([x for x in catalog if x.startswith("Bus stop · ")]) > 3000
+
+
+def test_unified_bus_stop_selection_resolves_exact_gtfs_ids():
+    from modules.location_catalog import build_location_catalog, bus_stop_ids
+    data = load_gtfs(ROOT / "data" / "gtfs")
+    metro = load_metro(ROOT / "data" / "gtfs" / "metro_stations.csv")
+    catalog = build_location_catalog(data["stops"], metro)
+    selected = catalog["Bus stop · Katraj"]
+    ids = bus_stop_ids(selected, data["stops"])
+    expected = set(data["stops"].loc[data["stops"].stop_name == "Katraj", "stop_id"])
+    assert ids == expected and ids
+
+
+def test_metro_station_selection_maps_to_nearby_pmpml_stops():
+    from modules.location_catalog import build_location_catalog, bus_stop_ids
+    data = load_gtfs(ROOT / "data" / "gtfs")
+    metro = load_metro(ROOT / "data" / "gtfs" / "metro_stations.csv")
+    catalog = build_location_catalog(data["stops"], metro)
+    ids = bus_stop_ids(catalog["Metro · Vanaz"], data["stops"])
+    assert ids
+    assert ids.issubset(set(data["stops"].stop_id))
+
+
+def test_unified_catalog_maps_mit_wpu_to_nearby_metro_reference():
+    from modules.location_catalog import build_location_catalog, nearest_metro_station
+    data = load_gtfs(ROOT / "data" / "gtfs")
+    metro = load_metro(ROOT / "data" / "gtfs" / "metro_stations.csv")
+    catalog = build_location_catalog(data["stops"], metro)
+    assert nearest_metro_station(catalog["Landmark · MIT-WPU"], metro) == "Vanaz"
+    assert nearest_metro_station(catalog["Metro · Vanaz"], metro) == "Vanaz"

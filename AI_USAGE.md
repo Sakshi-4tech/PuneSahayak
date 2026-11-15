@@ -1,7 +1,31 @@
 # Responsible AI and External-Code Use
 
-AI tools were used as development assistants for code review, debugging suggestions, test design, documentation and presentation preparation. Team members remain responsible for reading, verifying, testing and explaining every submitted component.
+## AI assistance disclosure
 
-The PMPML GTFS snapshot is attributed in `data/gtfs/SOURCE_NOTES.txt` and `DATA_SOURCES.md`. The bus journey planner contains adapted modules from the supplied Pune CommuteWise project archive; do not describe adapted upstream logic as wholly original. Preserve applicable attribution and licence notices.
+AI tools, including ChatGPT, were used during the development of PuneSahayak. This assistance included:
+- Generating and substantially modifying portions of Python code.
+- Explaining programming concepts and helping with implementation decisions.
+- Debugging errors and improving existing code.
+- Suggesting and preparing automated tests.
+- Assisting with documentation and presentation preparation.
 
-No live GPS, live traffic API, AI chatbot, generative route recommendation or predictive ML model is claimed in this project. The traffic view uses Pandas aggregation of the included historical CSV.
+The project team is responsible for reviewing, testing and understanding the submitted work. Passing automated tests does not mean every component was independently authored by the team.
+
+## External code and data
+
+The PMPML GTFS snapshot is attributed in `data/gtfs/SOURCE_NOTES.txt` and `DATA_SOURCES.md`.
+
+The project also includes adapted modules from the supplied Pune CommuteWise project archive. Applicable source attribution and licence notices must be preserved. Adapted upstream logic should not be presented as wholly original work.
+
+## Project limitations
+
+PuneSahayak does not claim to provide:
+- Live GPS tracking.
+- Live traffic API integration.
+- An AI chatbot.
+- Generative AI route recommendations.
+- A predictive machine-learning model.
+
+The traffic view uses Pandas to aggregate the included historical traffic CSV data.
+
+**Important:** AI assistance does not imply that the instructor has approved AI-generated code for submission. The team should clarify the permitted scope with the instructor.
