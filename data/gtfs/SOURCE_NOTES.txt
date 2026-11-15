@@ -1,0 +1,29 @@
+PUNESAHAYAK DATA PROVENANCE (reviewed 14 November 2026)
+
+PMPML BUS NETWORK
+- routes.txt, trips.txt, stops.txt and stop_times.txt are retained from the supplied Pune CommuteWise project archive.
+- The source project's README attributes the feed to https://github.com/croyla/pmpml-gtfs and states MIT-0 licensing. Keep attribution and check the upstream repository/license when redistributing.
+- The upstream repository describes an API-derived GTFS generator using Apli-PMPML/Chartr data. It is a community-maintained snapshot, not a PMPML-hosted official real-time feed.
+- The included snapshot contains 315 route records, 6,745 stop records, 10,128 trip records and 429,302 stop-time records. Counts describe the files included here, not a guarantee of every currently operating route or stop.
+- calendar.txt and calendar_dates.txt are not included. Do not claim a selected trip is guaranteed to operate on a particular weekday/date.
+- Stop times are schedule-derived estimates in the source feed. No live vehicle locations are supplied.
+
+PUNE METRO
+- metro_stations.csv was expanded using the official Pune Metro "Know Your Stations" and "Route Map" pages, accessed 14 November 2026:
+  https://www.punemetrorail.org/know-your-metro-stations
+  https://www.punemetrorail.org/route-map
+- It preserves all station/depot/interchange names shown in the official corridor listings used for this directory. The pages present alternate/updated corridor listings; this file is a name/order directory, not a guarantee that every listed item is an operational passenger station.
+- No Metro GTFS timetable, live service status or fare table is included.
+
+PUNE BUS STOPS AND ROUTES (SUPPLEMENTAL REFERENCE)
+- data/routes.csv is the existing CSV supplied with the project. Its columns are Route ID, Route Description, Route Description Marathi and Kilometer.
+- Related public dataset catalogue: https://data.opencity.in/dataset/pune-bus-stops-and-routes
+- The app's searchable bus stop directory is built from all rows in the included GTFS stops.txt file, not from a hand-picked shortlist.
+
+HISTORICAL ROAD TRAFFIC
+- data/processed_traffic.csv is retained from the original GoPune project. It contains historical camera observations from a small number of junctions.
+- Vehicle counts are not speed measurements and cannot be used as route-specific travel-time predictions or live congestion data.
+
+COST / TIME ESTIMATES
+- Fuel price, vehicle mileage, average speeds, bus/Metro fares and auto fare are assumptions or project reference values in modules/expense_calculator.py and app.py.
+- They are not live quotes. Users should confirm current fares and service details with the transport operator.

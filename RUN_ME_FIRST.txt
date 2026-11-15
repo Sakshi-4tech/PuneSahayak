@@ -1,0 +1,17 @@
+PUNESAHAYAK — UPDATED COMMUTER DASHBOARD
+
+WINDOWS:
+1. Extract this ZIP completely.
+2. Install Python 3.10 or newer (enable Add Python to PATH).
+3. Open the extracted PuneSahayak folder.
+4. Double-click START_PUNE_SAHAYAK.bat.
+5. Wait for installation; the dashboard opens in your browser.
+
+If double-click does not work, open PowerShell in this folder and run:
+  py -3 -m venv .venv
+  .venv\Scripts\Activate.ps1
+  python -m pip install -r requirements.txt
+  python -m streamlit run app.py
+
+Stop the app with Ctrl+C in the terminal.
+The app opens on Plan my journey. Use the sidebar for My commute budget. No account is required. See README.md for data provenance, assumptions, limitations and tests.
