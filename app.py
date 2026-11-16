@@ -15,6 +15,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules.expense_calculator import calculate_comparison
+from modules.fare_engine import pmpml_one_way_fare, metro_one_way_fare, metro_discount_rate
 from modules.recommendation import get_recommendations
 from modules.route_distance import PUNE_AREAS, get_road_distance_between
 from modules.location_catalog import build_location_catalog, bus_stop_ids, nearest_metro_station
@@ -471,12 +472,27 @@ if page == "Plan my journey":
         budget = c4.number_input("Monthly budget (₹)", 0, 100000, 3000, 100, key="journey_budget")
         priority = c5.selectbox("Show me the", ["Best balance", "Cheapest", "Fastest"], key="journey_priority")
         peak = st.checkbox("I usually travel during busy hours", value=True, help="Applies a stated estimate to road-based travel modes.")
+        with st.expander("Passes and travel discounts", expanded=False):
+            st.caption("Choose only a pass or card you actually hold. PuneSahayak will not assume student eligibility.")
+            pmpml_pass = st.selectbox("Your PMPML pass", ["No pass (single tickets)", "Daily pass (₹70/day)", "Monthly pass (₹1,500/month)"], key="punesahayak_pmpml_pass")
+            metro_pass = st.selectbox("Your Pune Metro pass / card", ["No pass / full fare", "One Pune Vidyarthi Pass (30% every day)", "One Pune NCMC card (10% weekdays)", "One Pune NCMC card (30% weekends)"], key="punesahayak_metro_pass")
         distance, distance_note = safe_road_distance(source_location["coords"], destination_location["coords"])
         st.caption(f"Approx. {distance:.1f} km one way · {distance_note}. Actual door-to-door distance may differ.")
         run_compare = st.button("Find my best options  →", use_container_width=True, type="primary")
 
+    # Resolve operator fares from bundled fare data; no user-entered fare is required.
+    bus_fare = pmpml_one_way_fare(distance)
+    metro_from = nearest_metro_station(source_location, metro_data) if metro_data is not None else None
+    metro_to = nearest_metro_station(destination_location, metro_data) if metro_data is not None else None
+    metro_fare = metro_one_way_fare(metro_from, metro_to) if metro_from and metro_to else None
+    metro_discount = metro_discount_rate(metro_pass)
+
     if run_compare:
-        comparison = calculate_comparison(distance, int(days), fuel_price=PETROL_PRICE_PER_LITRE, peak_hours=peak)
+        comparison = calculate_comparison(
+            distance, int(days), fuel_price=PETROL_PRICE_PER_LITRE, peak_hours=peak,
+            bus_one_way_fare=bus_fare, bus_pass_type=pmpml_pass,
+            metro_one_way_fare=metro_fare, metro_discount=metro_discount,
+        )
         rec = get_recommendations(comparison)
         details = rec["details"].copy()
         if priority == "Cheapest": best_mode = rec["cheapest"]
@@ -484,13 +500,14 @@ if page == "Plan my journey":
         else: best_mode = rec["balanced"]
         st.session_state["ps_result"] = {"details": details, "best": best_mode, "source": source_label,
             "destination": destination_label, "days": int(days), "budget": budget, "priority": priority,
-            "peak": peak, "distance": distance}
+            "peak": peak, "distance": distance, "pmpml_pass": pmpml_pass,
+            "metro_pass": metro_pass, "metro_from": metro_from, "metro_to": metro_to}
         # Clear previous route search when the main journey changes.
         st.session_state.pop("ps_bus_plans", None)
         st.session_state.pop("ps_bus_query", None)
 
     saved = st.session_state.get("ps_result")
-    current = saved and (saved["source"], saved["destination"], saved["days"], saved["priority"], saved["peak"]) == (source_label, destination_label, int(days), priority, peak)
+    current = saved and (saved["source"], saved["destination"], saved["days"], saved["priority"], saved["peak"], saved.get("pmpml_pass"), saved.get("metro_pass"), saved.get("metro_from"), saved.get("metro_to")) == (source_label, destination_label, int(days), priority, peak, pmpml_pass, metro_pass, metro_from, metro_to)
     if current:
         details = saved["details"].copy()
         best = details[details["Transport Mode"] == saved["best"]].iloc[0]
@@ -511,7 +528,7 @@ if page == "Plan my journey":
             st.warning(f"{saved['best']} is about {money(monthly-budget)} above your monthly budget.")
 
         with st.expander("Compare all travel modes"):
-            view = details[["Transport Mode", "Daily Cost (₹)", "Monthly Cost (₹)", "Daily Travel Time (min)"]].copy()
+            view = details[["Transport Mode", "Daily Cost (₹)", "Monthly Cost (₹)", "Daily Travel Time (min)", "Cost Basis"]].copy()
             view["Monthly budget"] = view["Monthly Cost (₹)"].apply(lambda x: "Within budget" if x <= budget else "Over budget")
             st.dataframe(view, hide_index=True, use_container_width=True)
             fig = px.bar(view.sort_values("Monthly Cost (₹)"), x="Transport Mode", y="Monthly Cost (₹)", text_auto=".0f", title="Estimated monthly travel cost")
@@ -569,12 +586,19 @@ if page == "Plan my journey":
                         r2.metric("Interchanges", route["changes"])
                         r3.metric("Stations travelled", route["stations"])
                         st.markdown("**Your Metro journey**")
+                        if metro_fare is not None:
+                            discounted_fare = metro_fare * (1 - metro_discount)
+                            st.metric("Estimated one-way Metro fare", f"₹{discounted_fare:.2f}", help=f"Base chart fare ₹{metro_fare:.0f}; selected discount {metro_discount:.0%}.")
                         for step in route["steps"]:
                             st.markdown(f"- {step}")
-                        st.caption("Station-to-station route suggestion only. This dataset does not include live train times, station access, operational alerts or official fare calculation.")
+                        st.caption("Station-to-station route suggestion only. Fare is shown when an exact chart entry is available; live train times, station access and operational alerts are not included.")
                     else:
                         st.info("The selected locations map to the same Metro station, so there is no station-to-station Metro journey to show.")
-        st.caption(f"Estimates use assumed fares, average speeds and vehicle efficiency (fuel reference ₹{PETROL_PRICE_PER_LITRE:.2f}/L). PMPML options use the supplied GTFS snapshot. This prototype does not provide live vehicle tracking or guaranteed departure times.")
+        st.caption("PMPML fare is estimated from the published distance-stage table using the road-distance estimate. Metro fare is looked up by nearest station pair where a chart entry is bundled. Fuel price is a dated Pune reference; vehicle mileage and road speeds are model assumptions.")
+        if bus_fare is None and pmpml_pass == "No pass (single tickets)":
+            st.info("PMPML single-ticket fare is not estimated for this distance because the published stage table covers up to 80 km.")
+        if metro_fare is None:
+            st.info(f"Metro cost is not ranked for this route because an exact fare-chart pair is not available for {metro_from or 'the origin station'} → {metro_to or 'the destination station'}. The app will not guess it.")
 
     else:
         st.markdown("<div style='padding:1rem 0;color:#687572'>Your travel options will appear here after you search. Start with two places above.</div>", unsafe_allow_html=True)

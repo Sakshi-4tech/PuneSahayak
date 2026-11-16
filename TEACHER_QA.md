@@ -55,3 +55,7 @@ Add an updated official GTFS feed with service calendars, validate fares against
 
 ## 15. What should we say about borrowed code/data?
 The bus-planner modules were adapted from the supplied Pune CommuteWise student project, and the bus data is from the community `croyla/pmpml-gtfs` feed. We acknowledge both sources in the README and presentation. We should not claim that those original modules or datasets were created by our team.
+
+
+### How are public-transport fares estimated?
+PMPML fares use the revised 11-stage schedule (estimated from the selected road distance) or the daily/monthly pass the commuter explicitly selects. Metro fares use the bundled station-pair chart entries; eligible One Pune Vidyarthi/NCMC discounts are applied only when selected by the user. Missing Metro fare pairs are not guessed.

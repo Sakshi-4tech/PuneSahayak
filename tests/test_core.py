@@ -77,8 +77,8 @@ def test_real_data_has_direct_katraj_to_hadapsar_route():
 
 def test_comparison_includes_auto_and_peak_only_affects_road_modes():
     from modules.expense_calculator import calculate_comparison
-    normal = calculate_comparison(10, 20, peak_hours=False)
-    peak = calculate_comparison(10, 20, peak_hours=True)
+    normal = calculate_comparison(10, 20, peak_hours=False, bus_one_way_fare=20, metro_one_way_fare=25)
+    peak = calculate_comparison(10, 20, peak_hours=True, bus_one_way_fare=20, metro_one_way_fare=25)
     normal = normal.set_index("Transport Mode")
     peak = peak.set_index("Transport Mode")
     assert {"Bus", "Auto", "Metro", "Two-wheeler", "Car"}.issubset(normal.index)
@@ -162,3 +162,41 @@ def test_unified_catalog_maps_mit_wpu_to_nearby_metro_reference():
     catalog = build_location_catalog(data["stops"], metro)
     assert nearest_metro_station(catalog["Landmark · MIT-WPU"], metro) == "Vanaz"
     assert nearest_metro_station(catalog["Metro · Vanaz"], metro) == "Vanaz"
+
+
+def test_pmpml_published_distance_stage_fares_and_limits():
+    from modules.fare_engine import pmpml_one_way_fare
+    assert pmpml_one_way_fare(4.9) == 10
+    assert pmpml_one_way_fare(5.0) == 10
+    assert pmpml_one_way_fare(5.1) == 20
+    assert pmpml_one_way_fare(29.9) == 60
+    assert pmpml_one_way_fare(35) == 70
+    assert pmpml_one_way_fare(75) == 120
+    assert pmpml_one_way_fare(81) is None
+
+
+def test_metro_fare_lookup_is_directional_and_missing_pairs_are_not_guessed():
+    from modules.fare_engine import metro_one_way_fare
+    assert metro_one_way_fare("Vanaz", "PCMC") == 35
+    assert metro_one_way_fare("PCMC", "Vanaz") == 35
+    assert metro_one_way_fare("Range Hill", "Vanaz") is None
+
+
+def test_only_selected_metro_pass_gets_discount():
+    from modules.fare_engine import metro_discount_rate
+    assert metro_discount_rate("No pass / full fare") == 0
+    assert metro_discount_rate("One Pune Vidyarthi Pass (30% every day)") == 0.30
+    assert metro_discount_rate("One Pune NCMC card (10% weekdays)") == 0.10
+
+
+def test_comparison_uses_bus_pass_and_metro_discount_only_when_selected():
+    from modules.expense_calculator import calculate_comparison
+    no_pass = calculate_comparison(10, 20, bus_one_way_fare=30, metro_one_way_fare=25)
+    with_pass = calculate_comparison(10, 20, bus_one_way_fare=30, bus_pass_type="Monthly pass (₹1,500/month)", metro_one_way_fare=25, metro_discount=0.30)
+    a = no_pass.set_index("Transport Mode")
+    b = with_pass.set_index("Transport Mode")
+    assert a.loc["Bus", "Monthly Cost (₹)"] == 1200
+    assert b.loc["Bus", "Monthly Cost (₹)"] == 1500
+    assert a.loc["Metro", "Monthly Cost (₹)"] == 1000
+    assert b.loc["Metro", "Monthly Cost (₹)"] == 700
+    assert "Cost Basis" in with_pass.columns

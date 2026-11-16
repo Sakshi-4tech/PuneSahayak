@@ -15,3 +15,10 @@
 - The Metro CSV is a corridor directory, not a Metro GTFS timetable. Some official route-map entries may represent depots or stations with changing operational status.
 - Traffic observations are historical counts, not route speed or travel-time data. Camera `a3` has unusually high counts in this file; the dashboard excludes it by default but lets the user include it for inspection.
 - Fares, speeds, mileage and fuel price in the comparison are explicitly labelled project assumptions/reference values.
+
+
+## Fare data update (16 November 2026)
+- PMPML 11-stage fare structure and ₹70 daily / ₹1,500 monthly unified passes: https://www.hindustantimes.com/cities/pune-news/pmpml-to-implement-revised-fare-structure-from-june-1-101748629689741.html
+- Maha Metro station-pair fare chart and One Pune pass discounts: https://www.punemetrorail.org/fare_chart.aspx ; https://www.punemetrorail.org/vidyarthiPass.aspx ; https://www.punemetrorail.org/one-pune-card-non-kyc.aspx?lang=en-US
+- Station-pair chart transcriptions used for the bundled directional lookup: https://mymetro.in/pune-metro/fare/ (secondary transcription that attributes amounts to operator chart images; check operator before travel).
+- Pune petrol reference: ₹111.90/L on 16 Nov 2026, https://www.indiatoday.in/fuel-price/petrol-price-in-pune-today

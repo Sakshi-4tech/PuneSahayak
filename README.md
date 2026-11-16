@@ -122,3 +122,7 @@ See `TEAM_OF_4.md` for a four-person work split, `VIVA_GUIDE.md` for likely viva
 ## Unified journey locations
 
 The journey planner provides one searchable From/To catalogue containing Pune localities, key landmarks, PMPML GTFS bus stops, and Metro stations. Bus and Metro suggestions reuse those same selections. Distance and nearest-station values are estimates based on reference coordinates; the app does not provide live tracking or walking directions.
+
+
+## Fare comparison
+PuneSahayak estimates PMPML single-ticket fares from the published 11-stage distance schedule, supports opt-in PMPML daily/monthly passes, and uses a bundled directional Maha Metro station-pair fare table where available. Metro discounts are applied only when a user selects a valid One Pune card/pass. Unsupported fare pairs are excluded instead of guessed. See `data/fares/README.md` for source scope and limitations.

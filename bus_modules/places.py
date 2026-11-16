@@ -14,9 +14,8 @@ from .route_stats import haversine
 # Add more here (a good task for a team member!). Keep the values as real place names.
 ALIASES = {
     "MIT-WPU (Kothrud)": "Kothrud",
-    "MIT-WPU": "Kothrud",
     "Pune Railway Station": "Pune Station",
-    "Pune Airport (Lohegaon)": "Lohegaon",
+    "Pune Airport (Lohegaon)": "Lohegaon Airport",
     "Shivajinagar": "Shivaji Nagar",
     "Hinjewadi": "Hinjawadi",
     "Civil Court / District Court (Metro)": "Shivaji Nagar Civil Court Metro Station",
