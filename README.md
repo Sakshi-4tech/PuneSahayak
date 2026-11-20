@@ -96,7 +96,7 @@ pytest -q
 
 The test suite checks core distance calculations, journey time conversions, Metro interchange suggestions, sample PMPML journeys, commute-cost comparison behaviour and historical traffic analysis.
 
-## 6. Important limitations — explain these in your viva
+## 6. Important limitations
 
 - **Not live tracking:** the PMPML feed is a community-maintained GTFS snapshot. The app does not receive live bus GPS positions.
 - **No service calendar:** `calendar.txt` and `calendar_dates.txt` are absent from the included feed, so a timetable entry cannot be guaranteed for a specific date or weekday.
