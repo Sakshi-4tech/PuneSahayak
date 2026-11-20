@@ -27,5 +27,3 @@ PuneSahayak does not claim to provide:
 - A predictive machine-learning model.
 
 The traffic view uses Pandas to aggregate the included historical traffic CSV data.
-
-**Important:** AI assistance does not imply that the instructor has approved AI-generated code for submission. The team should clarify the permitted scope with the instructor.
